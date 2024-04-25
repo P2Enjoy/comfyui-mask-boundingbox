@@ -22,8 +22,8 @@ class MaskBoundingBox:
             }
         }
     
-    RETURN_TYPES = ("INT", "INT", "INT", "INT", "INT", "INT",  "MASK", "IMAGE")
-    RETURN_NAMES = ("X1","X2", "Y1","Y2", "width", "height", "bounded mask", "bounded image")
+    RETURN_TYPES = ("INT", "INT", "INT", "INT", "INT", "INT",  "MASK", "MASK", "IMAGE")
+    RETURN_NAMES = ("X1","X2", "Y1","Y2", "width", "height", "bounded mask", "full mask", "bounded image")
     FUNCTION = "compute_bounding_box"
     CATEGORY = "image/processing"
     
@@ -34,7 +34,7 @@ class MaskBoundingBox:
         # Compute the bounding box
         non_zero_positions = torch.nonzero(mask_above_threshold, as_tuple=False)
         if len(non_zero_positions) == 0:
-            return (0, 0, 0, 0, 0, 0, torch.zeros_like(mask_bounding_box), torch.zeros_like(image_mapped))
+            return (0, 0, 0, 0, 0, 0, torch.zeros_like(mask_bounding_box), torch.zeros_like(image_mapped), torch.zeros_like(image_mapped))
 
         len_zeros = len(non_zero_positions[0])
         min_x = int(torch.min(non_zero_positions[:, len_zeros - 1]))
@@ -45,20 +45,10 @@ class MaskBoundingBox:
         if (len_zeros == 2):
             raw_bb = mask_bounding_box[int(min_y):int(max_y), int(min_x):int(max_x)]
         elif (len_zeros == 3):
-            raw_bb = mask_bounding_box[:,int(min_y):int(max_y), int(min_x):int(max_x)] 
+            raw_bb = mask_bounding_box[:,int(min_y):int(max_y), int(min_x):int(max_x)]
         elif (len_zeros == 4):
-            raw_bb = mask_bounding_box[:,:,int(min_y):int(max_y), int(min_x):int(max_x)] 
-
-        print (raw_bb == mask_bounding_box[...,int(min_y):int(max_y), int(min_x):int(max_x)])
-                    
-        print("here")
-        print(min_x, max_x, min_y, max_y)
-        print(len(non_zero_positions[0]))
-        print(non_zero_positions[:, 2])
-        for i in range(len_zeros):
-            print(str(i), mask_bounding_box.shape[i])
-            #array_to_text_file(non_zero_positions[:, i], "boudning_box_error_" + str(i) + ".txt")
-      
+            raw_bb = mask_bounding_box[:,:,int(min_y):int(max_y), int(min_x):int(max_x)]
+        
         pad_x = max(0, (min_width - (max_x - min_x)) / 2)
         pad_y = max(0, (min_height - (max_y - min_y)) / 2)
         
@@ -74,10 +64,14 @@ class MaskBoundingBox:
         max_x = min(max_x + pad_right, width)
         min_y = max(min_y - pad_top, 0)
         max_y = min(max_y + pad_bottom, height)
+
+        # Create the new mask
+        new_mask = torch.zeros_like(mask_bounding_box)
+        new_mask[..., int(min_y):int(max_y), int(min_x):int(max_x)] = 1
         
         raw_img = image_mapped[:,int(min_y):int(max_y),int(min_x):int(max_x),:]
 
-        return (int(min_x), int(max_x), int(min_y), int(max_y), int(max_x-min_x), int(max_y-min_y), raw_bb, raw_img)
+        return (int(min_x), int(max_x), int(min_y), int(max_y), int(max_x-min_x), int(max_y-min_y), raw_bb, new_mask, raw_img)
 
 
 NODE_CLASS_MAPPINGS = {
